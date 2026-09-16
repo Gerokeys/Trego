@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { AdminNav } from "@/components/admin-nav";
 import { formatMinorUnits } from "@/lib/money";
 import { timeAgo } from "@/lib/time";
 import { LISTING_STATUS_LABELS } from "@/lib/listing-status";
@@ -39,10 +40,10 @@ export default async function AdminReportsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <Link href="/admin" className="text-sm text-highlight underline">
-        ← Admin
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight">Open reports</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Open reports</h1>
+      <div className="mt-4">
+        <AdminNav current="/admin/reports" />
+      </div>
 
       {byListing.size === 0 ? (
         <p className="mt-8 text-muted">Nothing to review.</p>

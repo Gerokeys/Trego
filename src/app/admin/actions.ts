@@ -101,6 +101,48 @@ export async function suspendUserAction(formData: FormData) {
   refresh();
 }
 
+/** Suspends or restores an account. Suspended users are treated as logged out. */
+export async function setUserSuspensionAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const suspend = formData.get("suspend") === "true";
+  if (userId === admin.id) return;
+
+  const target = await db.user.findUnique({ where: { id: userId } });
+  if (!target) return;
+
+  if (suspend) {
+    if (target.role === "ADMIN") return; // demote first, deliberately
+    await suspendUserAction(formData);
+    return;
+  }
+
+  // Restoring leaves listings removed: the seller can relist what they still want.
+  await db.user.update({ where: { id: userId }, data: { suspendedAt: null } });
+  await notify(userId, {
+    title: "Your account has been restored",
+    body: "You can sign in again. Listings taken down during the suspension stay removed.",
+    href: "/account",
+    sms: true,
+  });
+
+  refresh();
+}
+
+/** Grants or removes admin access. Admins can't change their own role. */
+export async function setUserRoleAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const userId = String(formData.get("userId") ?? "");
+  const role = formData.get("role");
+  if (userId === admin.id || (role !== "ADMIN" && role !== "USER")) return;
+
+  const target = await db.user.findUnique({ where: { id: userId } });
+  if (!target || target.suspendedAt) return;
+
+  await db.user.update({ where: { id: userId }, data: { role } });
+  refresh();
+}
+
 export async function resolveDisputeAction(formData: FormData) {
   await requireAdmin();
   const orderId = String(formData.get("orderId") ?? "");

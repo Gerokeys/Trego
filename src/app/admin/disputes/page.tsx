@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { AdminNav } from "@/components/admin-nav";
 import { formatMinorUnits } from "@/lib/money";
 import { formatDateTime } from "@/lib/time";
 import { sweepEscrowDeadlines } from "@/lib/orders";
@@ -38,10 +39,10 @@ export default async function AdminDisputesPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <Link href="/admin" className="text-sm text-highlight underline">
-        ← Admin
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight">Open disputes</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Open disputes</h1>
+      <div className="mt-4">
+        <AdminNav current="/admin/disputes" />
+      </div>
       <p className="mt-1 text-sm text-muted">
         Judge against the listing: its condition grade, defect notes, photos and IMEI.
       </p>
