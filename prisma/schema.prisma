@@ -1,0 +1,443 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+/// A person using the platform. Anyone can browse/buy; a user becomes a
+/// seller by creating a SellerProfile, they are not separate account types.
+/// Accounts sign in with phone + password, Google, or both: phone/password
+/// are null for Google-only accounts, email/googleId null for phone-only ones.
+model User {
+  id              String    @id @default(cuid())
+  phoneNumber     String?   @unique
+  /// Set once the user proves they own phoneNumber with an SMS code.
+  phoneVerifiedAt DateTime?
+  passwordHash    String?
+  email           String?   @unique
+  googleId        String?   @unique
+  displayName     String
+  role            UserRole  @default(USER)
+  /// Suspended accounts are treated as logged out everywhere.
+  suspendedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sellerProfile       SellerProfile?
+  watchlist           WatchlistItem[]
+  cartItems           CartItem[]
+  notifications       Notification[]
+  phoneVerifications  PhoneVerification[]
+  buyerConversations  Conversation[]      @relation("ConversationBuyer")
+  sellerConversations Conversation[]      @relation("ConversationSeller")
+  messages            Message[]
+  reports             Report[]
+  offers              Offer[]
+  purchases           Order[]             @relation("OrderBuyer")
+  sales               Order[]             @relation("OrderSeller")
+  disputesOpened      Dispute[]
+  reviewsWritten      Review[]
+  savedSearches       SavedSearch[]
+
+  @@map("users")
+}
+
+/// One SMS code sent to prove ownership of a phone number. Only a hash of
+/// the code is stored.
+model PhoneVerification {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The number being verified; applied to the user when the code matches.
+  phoneNumber String
+  codeHash    String
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@map("phone_verifications")
+}
+
+model SellerProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String?
+  bio          String?
+  createdAt    DateTime @default(now())
+
+  listings Listing[]
+  reviews  Review[]
+
+  @@map("seller_profiles")
+}
+
+enum ConditionGrade {
+  LIKE_NEW
+  GOOD
+  FAIR
+  FOR_PARTS
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  /// Paid for through escrow; waiting for handover and inspection.
+  RESERVED
+  SOLD
+  REMOVED
+}
+
+enum Category {
+  PHONES
+  LAPTOPS
+  DESKTOPS
+  MONITORS
+  COMPONENTS
+  CAMERAS
+}
+
+enum ImeiStatus {
+  NOT_CHECKED
+  /// Checked (by an admin or a provider) and not reported lost or stolen.
+  CLEAN
+  BLACKLISTED
+}
+
+/// Phones are the core category, so a few fields stay phone-specific (imei)
+/// rather than going fully generic; they're simply left null for other
+/// categories. storageGb doubles as capacity for laptops, SSDs and RAM.
+model Listing {
+  id          String         @id @default(cuid())
+  sellerId    String
+  seller      SellerProfile  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  category    Category       @default(PHONES)
+  title       String
+  brand       String
+  model       String
+  storageGb   Int?
+  conditionGrade   ConditionGrade
+  defectsDescription String @default("")
+  /// Full IMEI is stored for the seller's own record and future device
+  /// checks, but only the last 4 digits are ever shown publicly (privacy-safe
+  /// identifier disclosure per product principles).
+  imei        String?
+  imeiStatus  ImeiStatus     @default(NOT_CHECKED)
+  imeiCheckedAt DateTime?
+
+  priceMinorUnits Int
+  currency        String @default("KES")
+  acceptsOffers   Boolean @default(true)
+
+  /// One of the 47 counties (src/lib/kenya.ts). Null on listings created
+  /// before location was added.
+  county      String?
+  /// Neighbourhood or town within the county, free text.
+  area        String?
+  meetUp      Boolean        @default(true)
+  delivery    Boolean        @default(false)
+
+  viewCount   Int            @default(0)
+  status      ListingStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  photos        ListingPhoto[]
+  watchers      WatchlistItem[]
+  cartItems     CartItem[]
+  conversations Conversation[]
+  reports       Report[]
+  offers        Offer[]
+  orders        Order[]
+
+  @@index([status, brand])
+  @@index([status, category])
+  @@index([status, county])
+  @@map("listings")
+}
+
+/// A listing a user has saved to their Watchlist.
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+  @@index([listingId])
+  @@map("watchlist_items")
+}
+
+/// Used items are one-of-a-kind, so a cart line has no quantity.
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+  @@index([listingId])
+  @@map("cart_items")
+}
+
+/// In-app notifications shown under the header bell.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String    @default("")
+  /// Internal path to open when the notification is clicked.
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+/// One buyer's thread with the seller about one listing.
+model Conversation {
+  id                  String    @id @default(cuid())
+  listingId           String
+  listing             Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId             String
+  buyer               User      @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  /// The seller's user id (not SellerProfile), to query inboxes directly.
+  sellerId            String
+  seller              User      @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  lastMessageAt       DateTime  @default(now())
+  lastMessageSenderId String?
+  buyerLastReadAt     DateTime?
+  sellerLastReadAt    DateTime?
+  createdAt           DateTime  @default(now())
+
+  messages Message[]
+
+  @@unique([listingId, buyerId])
+  @@index([buyerId, lastMessageAt])
+  @@index([sellerId, lastMessageAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+enum ReportReason {
+  SCAM
+  STOLEN
+  MISLEADING
+  PROHIBITED
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  ACTIONED
+  DISMISSED
+}
+
+/// A user flagging a listing for the admin team.
+model Report {
+  id         String       @id @default(cuid())
+  listingId  String
+  listing    Listing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporterId String
+  reporter   User         @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     ReportReason
+  details    String       @default("")
+  status     ReportStatus @default(OPEN)
+  resolvedAt DateTime?
+  createdAt  DateTime     @default(now())
+
+  @@unique([listingId, reporterId])
+  @@index([status, createdAt])
+  @@map("reports")
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+/// "Make an offer": a buyer proposes a lower price. Pending offers lapse at
+/// expiresAt; an accepted offer must be paid for before expiresAt.
+model Offer {
+  id               String      @id @default(cuid())
+  listingId        String
+  listing          Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId          String
+  buyer            User        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  amountMinorUnits Int
+  message          String      @default("")
+  status           OfferStatus @default(PENDING)
+  expiresAt        DateTime
+  respondedAt      DateTime?
+  createdAt        DateTime    @default(now())
+
+  orders Order[]
+
+  @@index([listingId, status])
+  @@index([buyerId, createdAt])
+  @@map("offers")
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  /// Money held in escrow; seller must hand over by handoverDeadline.
+  PAID
+  /// Buyer has the item and until inspectionEndsAt to confirm or dispute.
+  HANDED_OVER
+  COMPLETED
+  DISPUTED
+  REFUNDED
+  CANCELLED
+}
+
+enum HandoverMethod {
+  MEET_UP
+  DELIVERY
+}
+
+/// An escrow purchase of one listing. Rows are financial records: they are
+/// never deleted, and listings are soft-deleted (status REMOVED) instead.
+model Order {
+  id               String         @id @default(cuid())
+  listingId        String
+  listing          Listing        @relation(fields: [listingId], references: [id])
+  buyerId          String
+  buyer            User           @relation("OrderBuyer", fields: [buyerId], references: [id])
+  sellerId         String
+  seller           User           @relation("OrderSeller", fields: [sellerId], references: [id])
+  offerId          String?
+  offer            Offer?         @relation(fields: [offerId], references: [id])
+  amountMinorUnits Int
+  feeMinorUnits    Int            @default(0)
+  currency         String         @default("KES")
+  handoverMethod   HandoverMethod
+  status           OrderStatus    @default(PENDING_PAYMENT)
+  /// "simulated" in test mode; the partner's name once a real one is connected.
+  paymentProvider  String
+  paymentReference String?
+  paymentPhone     String?
+  paidAt           DateTime?
+  handoverDeadline DateTime?
+  handedOverAt     DateTime?
+  inspectionEndsAt DateTime?
+  completedAt      DateTime?
+  refundedAt       DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  dispute Dispute?
+  review  Review?
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([status])
+  @@map("orders")
+}
+
+enum DisputeStatus {
+  OPEN
+  REFUNDED
+  RELEASED
+}
+
+model Dispute {
+  id             String        @id @default(cuid())
+  orderId        String        @unique
+  order          Order         @relation(fields: [orderId], references: [id])
+  openedById     String
+  openedBy       User          @relation(fields: [openedById], references: [id])
+  reason         String
+  status         DisputeStatus @default(OPEN)
+  resolutionNote String        @default("")
+  resolvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([status, createdAt])
+  @@map("disputes")
+}
+
+/// Only the buyer of a completed escrow order can review, once per order,
+/// so every review is backed by a real purchase.
+model Review {
+  id        String        @id @default(cuid())
+  orderId   String        @unique
+  order     Order         @relation(fields: [orderId], references: [id])
+  sellerId  String
+  seller    SellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String        @default("")
+  createdAt DateTime      @default(now())
+
+  @@index([sellerId, createdAt])
+  @@map("reviews")
+}
+
+/// Browse filters saved by a user; new listings that match notify them.
+model SavedSearch {
+  id                 String          @id @default(cuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query              String          @default("")
+  category           Category?
+  conditionGrade     ConditionGrade?
+  county             String?
+  minPriceMinorUnits Int?
+  maxPriceMinorUnits Int?
+  createdAt          DateTime        @default(now())
+
+  @@index([userId])
+  @@map("saved_searches")
+}
+
+/// Email signups from the footer newsletter form.
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("newsletter_subscribers")
+}
+
+model ListingPhoto {
+  id        String   @id @default(cuid())
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("listing_photos")
+}
