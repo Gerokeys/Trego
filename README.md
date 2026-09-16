@@ -70,8 +70,28 @@ node smoke-test.mjs                     # browser smoke test (dev server must be
 npx prisma studio                       # inspect the database
 ```
 
+## Deploying
+
+`npm run build` runs `prisma generate` first, because the typed client lives in `node_modules` and a
+fresh CI install doesn't have it. Without that step every `db.*` call types as `any` and the build
+fails with "Module '@prisma/client' has no exported member 'PrismaClient'".
+
+Before the first deploy:
+
+1. **Point `DATABASE_URL` at a hosted PostgreSQL database** — the `docker compose` database only
+   exists on your machine.
+2. **Apply the migrations** to it: `npx prisma migrate deploy` (five migrations to date).
+3. **Set the environment variables** from the table above. `PAYMENTS_MODE` defaults to `disabled` in
+   production, so escrow checkout stays off until you deliberately enable it.
+4. **Schedule `/api/cron/escrow`** (every few minutes, `Authorization: Bearer $CRON_SECRET`) so
+   escrow deadlines apply even when nobody is browsing.
+
+> **Photo uploads need object storage on serverless hosts.** Listings photos are written to
+> `storage/uploads` on local disk and served by `/media/[...path]`. That works on a single server
+> with a persistent disk, but on Vercel-style hosting the filesystem is read-only and per-request, so
+> uploads will fail or vanish. Swap `saveListingPhoto` in `src/lib/uploads.ts` for S3/R2 before
+> launch.
+
 ## Notes
 
-- Listing photos are written to `storage/uploads` and served by `/media/[...path]`. This suits a
-  single server with a persistent disk; serverless or multi-instance hosting needs object storage.
 - The Terms and Privacy pages are plain-language drafts and have not been reviewed by a lawyer.
