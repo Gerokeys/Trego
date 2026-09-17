@@ -56,6 +56,7 @@ Copy the environment variables below into `.env` (it is gitignored):
 | `AT_USERNAME`, `AT_API_KEY` | for SMS | Africa's Talking; use `sandbox` with a sandbox key to test |
 | `AT_SENDER_ID` | optional | Approved alphanumeric sender ID |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | for Google sign-in | OAuth client; redirect URI `/api/auth/google/callback` |
+| `GOOGLE_REDIRECT_URI` | rarely | Overrides the callback URL, which is otherwise derived from the incoming request. Set it if a proxy or load balancer makes the app see a different host than the browser does. |
 | `PAYMENTS_MODE` | optional | `simulated` or `disabled` (defaults: simulated in dev, disabled in production) |
 | `CRON_SECRET` | for the scheduler | Bearer token for `/api/cron/escrow` |
 
@@ -76,10 +77,24 @@ npx prisma studio                       # inspect the database
 fresh CI install doesn't have it. Without that step every `db.*` call types as `any` and the build
 fails with "Module '@prisma/client' has no exported member 'PrismaClient'".
 
-Before the first deploy:
+### Choosing a host
+
+The sell form accepts up to 8 photos of 8 MB each, so `next.config.ts` raises the server action body
+limit to 70 MB. **Vercel caps serverless request bodies at 4.5 MB and that limit cannot be raised**,
+so uploading more than one ordinary phone photo fails there regardless of this setting.
+
+Deploy to a host that runs a normal long-lived Node server — Railway, Render, Fly.io — where the
+limit is yours to set. Nothing else in the app needs a persistent disk now that photos go to R2.
+
+To use Vercel anyway, the upload has to stop going through the server: have the browser PUT each
+photo straight to R2 with a presigned URL, which also removes the resize/EXIF-strip step in
+`src/lib/uploads.ts` from the request path.
+
+### Before the first deploy
 
 1. **Point `DATABASE_URL` at a hosted PostgreSQL database** — the `docker compose` database only
-   exists on your machine.
+   exists on your machine. Neon, Supabase and Railway all have a free tier; Neon's pooled connection
+   string works well with Prisma.
 2. **Apply the migrations** to it: `npx prisma migrate deploy` (five migrations to date).
 3. **Set the environment variables** from the table above. `PAYMENTS_MODE` defaults to `disabled` in
    production, so escrow checkout stays off until you deliberately enable it.
@@ -111,6 +126,19 @@ your host's bandwidth).
 
 Uploads are resized to 1600px JPEG and stripped of EXIF **before** they reach R2, so a 4 MB phone
 photo is stored as roughly 300 KB.
+
+**Moving existing photos into the bucket.** Photos uploaded before R2 was configured are on the
+local disk of whichever machine received them, under `storage/uploads` (`/media/...` URLs) or
+`public/uploads` (older `/uploads/...` URLs). Both folders are gitignored, so those files never
+reach the server and the listings break once deployed. Copy them over and repoint the database:
+
+```bash
+node scripts/backfill-photos.mjs --dry-run   # report what would move
+node scripts/backfill-photos.mjs             # do it
+```
+
+It is safe to re-run, skips photos already on R2, and leaves the local files as a backup. Seed
+images under `/photos/...` are left alone — they are committed to git and ship with the build.
 
 ## Notes
 
