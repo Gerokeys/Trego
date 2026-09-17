@@ -5,29 +5,46 @@ import sharp from "sharp";
 import { db } from "@/lib/db";
 import { formatMinorUnits } from "@/lib/money";
 import { CONDITION_LABELS } from "@/lib/conditions";
-import { UPLOAD_ROOT } from "@/lib/uploads";
+import { getPhoto } from "@/lib/storage";
 
 export const alt = "Listing on Trego";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-/** Resolves a listing photo URL to a file on disk. */
-function photoPath(url: string) {
-  if (url.startsWith("/media/")) {
-    return path.join(UPLOAD_ROOT, ...url.slice("/media/".length).split("/"));
+/** Loads a listing photo's bytes, wherever it is stored. */
+async function photoBytes(url: string): Promise<Uint8Array | null> {
+  // Public R2 (or any absolute URL): fetch it.
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      return res.ok ? new Uint8Array(await res.arrayBuffer()) : null;
+    } catch {
+      return null;
+    }
   }
+  // Uploaded photo: local disk or a private R2 bucket.
+  if (url.startsWith("/media/")) {
+    const object = await getPhoto(url.slice("/media/".length));
+    return object?.body ?? null;
+  }
+  // Seeded demo photo shipped in public/.
   if (url.startsWith("/photos/")) {
-    return path.join(process.cwd(), "public", ...decodeURIComponent(url).slice(1).split("/"));
+    try {
+      const file = path.join(process.cwd(), "public", ...decodeURIComponent(url).slice(1).split("/"));
+      return new Uint8Array(await readFile(file));
+    } catch {
+      return null;
+    }
   }
   return null;
 }
 
 /** The OG renderer can't decode WebP/AVIF, so normalise the photo to PNG. */
 async function photoDataUrl(url: string | undefined) {
-  const file = url ? photoPath(url) : null;
-  if (!file) return null;
+  const bytes = url ? await photoBytes(url) : null;
+  if (!bytes) return null;
   try {
-    const png = await sharp(await readFile(file))
+    const png = await sharp(bytes)
       .resize(520, 520, { fit: "contain", background: "#ffffff" })
       .png()
       .toBuffer();

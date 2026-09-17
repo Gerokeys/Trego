@@ -86,11 +86,31 @@ Before the first deploy:
 4. **Schedule `/api/cron/escrow`** (every few minutes, `Authorization: Bearer $CRON_SECRET`) so
    escrow deadlines apply even when nobody is browsing.
 
-> **Photo uploads need object storage on serverless hosts.** Listings photos are written to
-> `storage/uploads` on local disk and served by `/media/[...path]`. That works on a single server
-> with a persistent disk, but on Vercel-style hosting the filesystem is read-only and per-request, so
-> uploads will fail or vanish. Swap `saveListingPhoto` in `src/lib/uploads.ts` for S3/R2 before
-> launch.
+### Photo storage (Cloudflare R2)
+
+Photos are written to `storage/uploads` on local disk by default, which is fine for development and
+for a single server with a persistent disk. Serverless hosts have a read-only, per-request
+filesystem, so uploads there must go to object storage.
+
+Set these four variables and photos go to R2 instead — no code change:
+
+```
+R2_ACCOUNT_ID=…          # dash.cloudflare.com → R2 (right-hand sidebar)
+R2_BUCKET=…              # the bucket name you created
+R2_ACCESS_KEY_ID=…       # R2 → Manage API tokens → Create (Object Read & Write)
+R2_SECRET_ACCESS_KEY=…   # shown once when the token is created
+R2_PUBLIC_BASE_URL=…     # optional, see below
+```
+
+**Serving the photos.** With `R2_PUBLIC_BASE_URL` set — either the bucket's r2.dev address
+(Settings → Public Development URL) or a custom domain — stored URLs point straight at Cloudflare's
+CDN, and R2 charges nothing for egress. Add that host to `images.remotePatterns`; `next.config.ts`
+does it automatically from the same variable. Leave it empty to keep the bucket private, and
+`/media/[...path]` will fetch each file through the server instead (simpler, but slower and it uses
+your host's bandwidth).
+
+Uploads are resized to 1600px JPEG and stripped of EXIF **before** they reach R2, so a 4 MB phone
+photo is stored as roughly 300 KB.
 
 ## Notes
 
