@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { SITE_URL } from "./site";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -26,11 +27,21 @@ export function getGoogleConfig() {
   return { clientId, clientSecret };
 }
 
+/**
+ * The callback Google redirects back to. It must match a URI registered on
+ * the OAuth client character for character.
+ *
+ * Behind a proxy -- Railway, and most hosts -- the incoming request URL is the
+ * container's internal address (localhost:3000), not the public one, so deriving
+ * it from the request sends Google a redirect_uri that can never match.
+ * NEXT_PUBLIC_SITE_URL is the public origin, so prefer it when set, and let
+ * GOOGLE_REDIRECT_URI override both when the callback lives somewhere else.
+ */
 export function getGoogleRedirectUri(requestUrl: string) {
-  return (
-    process.env.GOOGLE_REDIRECT_URI ||
-    new URL("/api/auth/google/callback", requestUrl).toString()
-  );
+  const override = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (override) return override;
+  const base = process.env.NEXT_PUBLIC_SITE_URL?.trim() ? SITE_URL : requestUrl;
+  return new URL("/api/auth/google/callback", base).toString();
 }
 
 export function createPkcePair() {
