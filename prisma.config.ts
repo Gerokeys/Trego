@@ -1,7 +1,7 @@
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 // The Prisma CLI does not auto-load .env the way Next.js does, so load it
-// explicitly (Node 20.6+ built-in) before defineConfig reads DATABASE_URL.
+// explicitly (Node 20.6+ built-in) before the config reads DATABASE_URL.
 try {
   process.loadEnvFile();
 } catch {
@@ -14,6 +14,11 @@ export default defineConfig({
     seed: "node prisma/seed.mjs",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // `prisma generate` never connects, but it runs during install and build,
+    // and hosts commonly expose DATABASE_URL only at runtime. env() throws on
+    // a missing variable and would fail the build there, so fall back instead.
+    // Commands that genuinely connect (migrate, seed, studio) still fail
+    // loudly on their own if the URL is wrong or absent.
+    url: process.env.DATABASE_URL ?? "postgresql://database-url-not-set",
   },
 });
