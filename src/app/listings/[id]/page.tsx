@@ -164,6 +164,7 @@ export default async function ListingDetailPage({ params }: PageProps<"/listings
           <p className="mt-1 text-muted">
             {listing.brand} · {listing.model}
             {listing.storageGb ? ` · ${listing.storageGb}GB` : ""}
+            {listing.ramGb ? ` · ${listing.ramGb}GB RAM` : ""}
           </p>
           <p className="mt-4 text-3xl font-semibold">
             {price}

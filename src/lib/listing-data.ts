@@ -1,5 +1,6 @@
 import type { ListingInput } from "./validation";
 import { majorToMinorUnits } from "./money";
+import { CATEGORIES_WITH_RAM } from "./categories";
 
 export const MAX_PHOTOS = 8;
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -13,6 +14,7 @@ export function listingColumns(data: ListingInput) {
     brand: data.brand,
     model: data.model,
     storageGb: data.storageGb ?? null,
+    ramGb: CATEGORIES_WITH_RAM.includes(data.category) ? (data.ramGb ?? null) : null,
     conditionGrade: data.conditionGrade,
     defectsDescription: data.defectsDescription,
     imei: data.category === "PHONES" ? (data.imei ?? null) : null,

@@ -15,6 +15,9 @@ export const CATEGORY_VALUES = CATEGORIES.map((c) => c.value) as [
   ...CategoryValue[],
 ];
 
+/** Categories where RAM is worth stating; the sell form only asks for these. */
+export const CATEGORIES_WITH_RAM: readonly string[] = ["PHONES", "LAPTOPS", "DESKTOPS"];
+
 export function categoryLabel(value: string) {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }

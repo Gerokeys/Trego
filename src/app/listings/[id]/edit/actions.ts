@@ -30,21 +30,28 @@ export async function updateListingAction(
 
   const parsed = listingSchema.safeParse(listingFormValues(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form and try again." };
+    const issue = parsed.error.issues[0];
+    return {
+      error: issue?.message ?? "Check the form and try again.",
+      field: typeof issue?.path[0] === "string" ? issue.path[0] : undefined,
+    };
   }
 
   const removeIds = new Set(formData.getAll("removePhoto").map(String));
   const kept = listing.photos.filter((photo) => !removeIds.has(photo.id));
   const newPhotos = getPhotoFiles(formData);
   const photoError = validatePhotoFiles(newPhotos, kept.length);
-  if (photoError) return { error: photoError };
+  if (photoError) return { error: photoError, field: "photos" };
 
   const savedUrls: string[] = [];
   try {
     for (const photo of newPhotos) savedUrls.push(await saveListingPhoto(listing.id, photo));
   } catch (err) {
     console.error("Saving listing photos failed:", err);
-    return { error: "One of the photos couldn’t be read. Try a different JPG, PNG or WebP file." };
+    return {
+      error: "One of the photos couldn’t be read. Try a different JPG, PNG or WebP file.",
+      field: "photos",
+    };
   }
 
   const columns = listingColumns(parsed.data);

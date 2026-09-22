@@ -49,6 +49,13 @@ export const listingSchema = z
     brand: z.string().trim().min(1, "Brand is required").max(40),
     model: z.string().trim().min(1, "Model is required").max(60),
     storageGb: z.coerce.number().int().positive().optional().or(z.literal("").transform(() => undefined)),
+    ramGb: z.coerce
+      .number()
+      .int()
+      .positive()
+      .max(1024)
+      .optional()
+      .or(z.literal("").transform(() => undefined)),
     conditionGrade: z.enum(CONDITION_GRADES, "Choose a condition grade"),
     defectsDescription: z.string().trim().max(2000).default(""),
     imei: z
@@ -77,6 +84,7 @@ export function listingFormValues(formData: FormData) {
     brand: formData.get("brand"),
     model: formData.get("model"),
     storageGb: formData.get("storageGb"),
+    ramGb: formData.get("ramGb") ?? "",
     conditionGrade: formData.get("conditionGrade"),
     defectsDescription: formData.get("defectsDescription") ?? "",
     imei: formData.get("imei") ?? "",

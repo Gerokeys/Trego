@@ -126,6 +126,8 @@ model Listing {
   brand       String
   model       String
   storageGb   Int?
+  /// Optional: phones, laptops and desktops.
+  ramGb       Int?
   conditionGrade   ConditionGrade
   defectsDescription String @default("")
   /// Full IMEI is stored for the seller's own record and future device

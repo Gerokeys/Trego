@@ -19,12 +19,16 @@ export async function createListingAction(
 
   const parsed = listingSchema.safeParse(listingFormValues(formData));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form and try again." };
+    const issue = parsed.error.issues[0];
+    return {
+      error: issue?.message ?? "Check the form and try again.",
+      field: typeof issue?.path[0] === "string" ? issue.path[0] : undefined,
+    };
   }
 
   const photos = getPhotoFiles(formData);
   const photoError = validatePhotoFiles(photos, 0);
-  if (photoError) return { error: photoError };
+  if (photoError) return { error: photoError, field: "photos" };
 
   const publish = formData.get("intent") !== "draft";
   const sellerProfile = await db.sellerProfile.upsert({
@@ -51,7 +55,10 @@ export async function createListingAction(
     console.error("Saving listing photos failed:", err);
     // Brand-new listing with no orders or messages yet, so it's safe to drop.
     await db.listing.delete({ where: { id: listing.id } });
-    return { error: "One of the photos couldn’t be read. Try a different JPG, PNG or WebP file." };
+    return {
+      error: "One of the photos couldn’t be read. Try a different JPG, PNG or WebP file.",
+      field: "photos",
+    };
   }
 
   if (publish) {

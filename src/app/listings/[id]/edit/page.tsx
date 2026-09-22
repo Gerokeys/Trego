@@ -47,6 +47,7 @@ export default async function EditListingPage({ params }: PageProps<"/listings/[
           brand: listing.brand,
           model: listing.model,
           storageGb: listing.storageGb,
+          ramGb: listing.ramGb,
           priceMajorUnits: listing.priceMinorUnits / 100,
           conditionGrade: listing.conditionGrade,
           defectsDescription: listing.defectsDescription,
