@@ -57,3 +57,15 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+/* iOS Safari zooms the whole page into any focused field whose text is under
+   16px, and leaves it zoomed. Keep form text at 16px on phones instead of
+   blocking zoom (which would also stop people pinch-zooming to read).
+   Unlayered on purpose: it outranks Tailwind's text-sm utilities. */
+@media (max-width: 639.98px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

@@ -5,6 +5,7 @@ import { notify } from "./notifications";
 import { formatMinorUnits } from "./money";
 import { categoryLabel } from "./categories";
 import { CONDITION_LABELS } from "./conditions";
+import { searchWords } from "./listing-search";
 
 export function matchesSavedSearch(search: SavedSearch, listing: Listing) {
   if (search.category && search.category !== listing.category) return false;
@@ -14,7 +15,8 @@ export function matchesSavedSearch(search: SavedSearch, listing: Listing) {
   if (search.maxPriceMinorUnits != null && listing.priceMinorUnits > search.maxPriceMinorUnits) return false;
   if (search.query) {
     const haystack = `${listing.title} ${listing.brand} ${listing.model}`.toLowerCase();
-    if (!haystack.includes(search.query.toLowerCase())) return false;
+    // Same rule as the browse results: every word must appear somewhere.
+    if (!searchWords(search.query).every((word) => haystack.includes(word))) return false;
   }
   return true;
 }
