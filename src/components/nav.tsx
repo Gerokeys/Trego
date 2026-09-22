@@ -9,6 +9,7 @@ import { CATEGORIES } from "@/lib/categories";
 import { Dropdown } from "@/components/dropdown";
 import { SearchBar, SearchBarFromUrl } from "@/components/search-bar";
 import { NotificationItem } from "@/components/notification-item";
+import { MobileMenu } from "@/components/mobile-menu";
 import { BellIcon, CartIcon, ChevronDownIcon, MessageIcon } from "@/components/icons";
 
 async function getHeaderData(userId: string) {
@@ -49,8 +50,45 @@ export async function Nav() {
 
   return (
     <header className="bg-surface">
-      {/* Utility bar */}
-      <div className="border-b border-border">
+      {/* Phones: eBay-style bar. Everything else lives in the menu drawer. */}
+      <div className="flex items-center px-1.5 pt-1.5 sm:hidden">
+        <MobileMenu
+          user={user ? { firstName: user.displayName.split(" ")[0], isAdmin: user.role === "ADMIN" } : null}
+          unreadMessages={data?.unreadMessages ?? 0}
+          unreadNotifications={data?.unreadCount ?? 0}
+          watchCount={data?.watchCount ?? 0}
+        />
+        <Link href="/" aria-label="Trego home" className="flex shrink-0 items-center px-1">
+          <Image
+            src="/trego-wordmark.png"
+            alt="Trego"
+            width={483}
+            height={120}
+            priority
+            className="h-7 w-auto"
+          />
+        </Link>
+        <div className="ml-auto flex items-center">
+          <Link
+            href={data ? "/notifications" : "/login"}
+            aria-label={`Notifications${data?.unreadCount ? `, ${data.unreadCount} unread` : ""}`}
+            className="flex p-2.5"
+          >
+            <span className="relative flex">
+              <BellIcon className="h-6 w-6" />
+              <CountBadge count={data?.unreadCount ?? 0} />
+            </span>
+          </Link>
+          <Link href="/cart" aria-label={`Cart, ${data?.cartCount ?? 0} items`} className="flex p-2.5">
+            <span className="relative flex">
+              <CartIcon className="h-6 w-6" />
+              <CountBadge count={data?.cartCount ?? 0} />
+            </span>
+          </Link>
+        </div>
+      </div>
+      {/* Utility bar (tablet and up) */}
+      <div className="hidden border-b border-border sm:block">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-1.5 text-xs">
           <div className="flex items-center gap-5">
             {user ? (
@@ -172,8 +210,8 @@ export async function Nav() {
       </div>
 
       {/* Logo, category menu and search */}
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-4 py-4">
-        <Link href="/" aria-label="Trego home" className="flex shrink-0 items-center">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 border-b border-border px-4 pt-1 pb-3 sm:border-b-0 sm:py-4">
+        <Link href="/" aria-label="Trego home" className="hidden shrink-0 items-center sm:flex">
           <Image
             src="/trego-wordmark.png"
             alt="Trego"
@@ -230,8 +268,8 @@ export async function Nav() {
         </Suspense>
       </div>
 
-      {/* Category row */}
-      <nav aria-label="Categories" className="border-y border-border">
+      {/* Category row (tablet and up; phones use the menu drawer) */}
+      <nav aria-label="Categories" className="hidden border-y border-border sm:block">
         <ul className="mx-auto flex max-w-6xl gap-6 overflow-x-auto px-4 py-2.5 text-sm whitespace-nowrap text-foreground/80 md:justify-center">
           <li>
             <Link href="/browse" className="hover:text-foreground hover:underline">

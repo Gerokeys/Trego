@@ -23,6 +23,7 @@ export function SearchBar({ q, category }: { q: string; category: string }) {
           name="q"
           defaultValue={q}
           placeholder="Search for phones, laptops, cameras…"
+          enterKeyHint="search"
           className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm outline-none"
         />
         <label htmlFor="site-search-category" className="sr-only">
@@ -46,7 +47,9 @@ export function SearchBar({ q, category }: { q: string; category: string }) {
       </div>
       <button
         type="submit"
-        className="shrink-0 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground hover:opacity-90"
+        // Phones submit from the keyboard's search key, as on eBay, which
+        // leaves the whole width for typing.
+        className="hidden shrink-0 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground hover:opacity-90 sm:block"
       >
         Search
       </button>
